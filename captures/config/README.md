@@ -1,3 +1,6 @@
-# Chromium test policies
+# Chromium policies for T7
 
-These two managed-policy JSON files were imported to reproduce the teammate's T7 conditions: `ech_off_policy.json` disables ECH, and `doh_policy.json` configures encrypted DNS. The supplied ECH-off/on page responses are summarized in `results/track1/page-observations.md`; the ECH+DoH page did not load in the imported run. Policies are copied into the temporary lab container by the recorded recipe and do not alter the host system.
+- `ech_off_policy.json` turns ECH off (`EncryptedClientHelloEnabled=false`).
+- `doh_policy.json` turns on DNS over HTTPS to Cloudflare.
+
+The capture recipe copies them into the lab container only, so they do not change the host machine. The page outputs from the ECH runs are in `results/track1/page-observations.md`.

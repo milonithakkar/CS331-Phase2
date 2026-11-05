@@ -1,36 +1,32 @@
-# Track 2 reproducible audit artifacts
+# Track 2 results
 
-## WSL verification batch
+## Verification runs
 
-The user-run batch at `verification-batch-20261104-201936/` was generated on Ubuntu WSL at source commit `619a694a9fe449d97b4a54e487f0db7254b1fc08` and added to this branch in `00f34e4`. It contains environment/preflight, manifest and test logs, source/script hashes, QUIC Initial DCID inventory, SYN analysis, and six deterministic impairment cases for each of the Chromium and curl traces, including variants, TShark raw exports, logs, and result JSON. Its SHA256 manifest passed from the repository root; the relevant JSON parsed successfully in this checkout.
+Each `verification-batch-*` folder is one run of `code/scripts/verify_submission_batch.sh` on the WSL machine. Each holds the environment and tool versions, the hashes of the input pcaps and scripts, the build and test logs, the QUIC connection ID inventory, the SYN analysis of the offload pcaps, and the damaged-copy comparison: for each case the damaged pcap, TShark's raw output, the extractor's log and a result JSON.
 
-The WSL execution is user-run evidence, not a run independently reproduced in Arena. For each client, the six case comparisons report 27/27 exact-byte matches with TShark output on the same PCAP variant, no misses/extras; the every-third-drop arm is 2/2 in both tools. This is comparator agreement for bounded cases, not external ground truth. See `../../results/verification-status.md`, `../../docs/planning/DECISIONS.md`, and `../../LEDGER.md` for interpretation.
+| folder | source commit | contents |
+|---|---|---|
+| `verification-batch-20261104-201936` | `619a694` | stateless mode only; 27/27 per capture, 54/54 in total |
+| `verification-batch-20261105-054047` | `f642d1a` | the same checks again, same result |
+| `verification-batch-20261105-105416` | `fa9fcdb` (arena branch) | adds the stateful mode and the seven-row checker; the README and report use this one |
 
-Do not edit or overwrite the committed batch. New runs should use a new timestamped directory from `code/scripts/verify_submission_batch.sh`, reviewed for provenance and privacy first.
+Every comparison is against TShark on the same pcap. In the every-third-packet-dropped case TShark itself only finds 2 ClientHellos, so 2/2 there means we agree with TShark. The full results are explained in [`docs/quic/implementation-status.md`](../../docs/quic/implementation-status.md).
 
-## Related QUIC artifacts
+Do not edit a run folder. A new run goes into a new folder.
 
-- `quic-initial-dcid-inventory.json` at the parent Track 2 results directory is generated from the two committed classic-PCAP QUIC v1 captures. It preserves source PCAP hashes, packet record numbers, UDP endpoints, Initial DCIDs/SCIDs, and per-flow summaries. It is a derived header inventory, not decrypted payload evidence. Five later client Initial packets per trace use switched DCIDs matching server Initial SCIDs; these are not server-direction decrypt attempts.
-- Earlier exact-byte `tls.handshake_raw` exports and the direct clean-capture comparison script are distinct from the batch's raw `jsonraw` case outputs and are not preserved as a separate export. The batch nonetheless includes per-case TShark raw outputs and the comparison metrics used for its bounded matrix.
+## Other files
 
-## L3 paired-probe evidence
+- `quic-initial-dcid-inventory.json`: the QUIC Initial headers of the two QUIC pcaps (UDP endpoints, connection IDs, packet numbers), made by `code/scripts/quic_initial_inventory.py`. It shows, for each of the five flows per capture, the client's later Initials using the server's connection ID.
+- `l3-paired-probe-c28a486.md`: notes on an earlier L3 probe, before the paired Windows run.
+- `l3-live-paired-probe-20261105/`: pcaps and comparison from a paired L3 probe on 5 November. The full paired run used in T3 is in `results/l3_paired_batch/`.
 
-The report in `l3-paired-probe-c28a486.md` is a user-transcribed summary; the original paired-probe PCAPs/JSON were not supplied. It reports an inner container handshake missing from WSL `eth0`; it does not establish the suspected Windows/utility-VM path. The WSL batch's offload SYN analysis uses two separate captures and does not pair them. Obtain synchronized Windows/host-side and container/bridge captures before making an outer-vantage or proxy-termination claim.
-
-## Regeneration commands
-
-The batch runner includes the QUIC inventory, SYN analysis, and impairment commands in a single run. For a standalone impairment evaluation, use:
+## Running the damaged-copy comparison alone
 
 ```sh
-python3 code/scripts/quic_impairment.py \
-  --input captures/pcaps/quic_chromium.pcap \
-  --work-dir results/reproduced/quic_impairment/chromium \
-  --extractor build/code/quic/src/quic-fingerprint --tshark tshark --seed 331
-
 python3 code/scripts/quic_impairment.py \
   --input captures/pcaps/quic_curl.pcap \
   --work-dir results/reproduced/quic_impairment/curl \
   --extractor build/code/quic/src/quic-fingerprint --tshark tshark --seed 331
 ```
 
-Keep scratch output under ignored `results/reproduced/`. To promote evidence, use a new `results/track2/` subdirectory, retain raw source artifacts and hashes, document exact commands and versions, and review privacy before tracking. Never substitute a transcription for original packet or tool output.
+Add `--stateful-initial-context` for the stateful mode. Output goes to the ignored `results/reproduced/`.
