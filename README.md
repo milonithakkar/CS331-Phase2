@@ -15,7 +15,7 @@ In Project 1 we wrote our own JA3/JA3S/JA4 fingerprinting tool. Project 2 asked 
 
 A TLS fingerprint is computed from the ClientHello, the first message of a TLS connection, which is sent in plaintext. Different fingerprints read different things: JA3 and JA4 read the ClientHello, JA4T the TCP SYN, JA4X the server certificate and JA4H the HTTP request. We first listed which fields each one uses and which RFC defines them ([`docs/landscape.md`](docs/landscape.md)). Then we changed one thing at a time and captured real traffic: QUIC instead of TCP, no TLS keys, the capture point and segmentation offload, a post-quantum key share, many connections from one browser, IPv6, and ECH. These are the seven tests L1 to L7 (Track 1), each written up in [`docs/tests/`](docs/tests/README.md).
 
-We also wrote our own QUIC Initial extractor in C++ and checked its output byte for byte against TShark (Track 2). While testing it we found that the client's later Initial packets must be decrypted with keys from its first connection ID, even after the server has switched to its own ID, so we added a stateful mode for this.
+We also wrote our own QUIC Initial extractor in C++ (with AI's help, all documented) and checked its output byte for byte against TShark (Track 2). While testing it we found that the client's later Initial packets must be decrypted with keys from its first connection ID, even after the server has switched to its own ID, so we added a stateful mode for this.
 
 ## Results
 
