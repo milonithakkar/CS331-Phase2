@@ -1,15 +1,15 @@
 # Fingerprint field cards
 
-These cards expand the comparative survey in [`../landscape.md`](../landscape.md). JA3/JA4 names and normalization are implementation-defined constructions, not IETF fingerprint standards. The RFC references below define wire fields, not the fingerprint algorithms.
+One short card per fingerprint: which message it reads, which fields go in, how they are combined, and what you can see without TLS keys. The comparison of all seven is in [`../landscape.md`](../landscape.md).
 
-| Card | Layer / message | Primary implementation reference |
+| Card | Reads | Defined by |
 |---|---|---|
-| [JA3](ja3.md) | Client TLS ClientHello | Salesforce JA3 repository |
-| [JA3S](ja3s.md) | Server TLS ServerHello | Salesforce JA3 repository |
-| [JA4](ja4.md) | Client TLS/QUIC ClientHello | FoxIO JA4+ v1.0.1 |
-| [JA4S](ja4s.md) | Server TLS/QUIC ServerHello | FoxIO JA4+ v1.0.1 |
-| [JA4T](ja4t.md) | Client TCP SYN | FoxIO JA4+ v1.0.1 |
+| [JA3](ja3.md) | client ClientHello | Salesforce JA3 repository |
+| [JA3S](ja3s.md) | server ServerHello | Salesforce JA3 repository |
+| [JA4](ja4.md) | client ClientHello (TCP or QUIC) | FoxIO JA4+ v1.0.1 |
+| [JA4S](ja4s.md) | server ServerHello (TCP or QUIC) | FoxIO JA4+ v1.0.1 |
+| [JA4T](ja4t.md) | client TCP SYN | FoxIO JA4+ v1.0.1 |
 | [JA4X](ja4x.md) | X.509 certificate | FoxIO JA4+ v1.0.1 |
 | [JA4H](ja4h.md) | HTTP request | FoxIO JA4+ v1.0.1 |
 
-**Checked:** 5 November 2026 against the source links in `docs/landscape.md`. This is a concise technical reference, not a systematic literature review. Pin tool/source versions before comparing output; the project’s WSL and Docker lab toolchains differ. Do not interpret a fingerprint as a unique host, user, application, or origin identity.
+None of these is an IETF standard. The RFCs linked in each card define the protocol fields; the fingerprint recipe comes from Salesforce or FoxIO. Sources were checked on 5 November 2026.
