@@ -1,8 +1,6 @@
-# Track 1 results — audited import
+# Track 1 results
 
-These tool outputs and measurements are teammate-supplied from Yash's Docker lab; they were not rerun in this integration environment. The unmodified source summary is preserved at `results/imported/yash-summary.md` and `.json`. This audited view corrects the empty IPv6 capture: its zero-packet pcap cannot establish `tools_agree`. See `docs/track1-evidence-audit.md` for other provenance and interpretation limits.
-
-## Imported Track 1 analysis table (audited copy; not regenerated in this checkout)
+One row per Track 1 capture, from Yash's Docker lab. This is a checked copy of his summary (the original is in `imported/`). The only change is the IPv6 row: its pcap has no packets, so `tools_agree` is marked not comparable instead of True. Numbers that this table does not hold, such as the ClientHello frame size in L3, were re-checked in [`track1/recheck-20261106.md`](track1/recheck-20261106.md). Note that `biggest_frame` is the biggest frame in the whole pcap, in either direction.
 
 | id | limitation | hellos_tshark | hellos_ja4 | distinct_ja3 | distinct_ja4 | distinct_ja4_main | tools_agree | ja4x_ja4h_no_keys | ja4x_ja4h_with_keys | hello_bytes_max | pieces_max | biggest_frame | groups_chosen | ech_ext_hellos | seconds_tshark | seconds_ja4 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
