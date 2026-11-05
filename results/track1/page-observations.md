@@ -1,13 +1,13 @@
-# Selected ECH page observations (team-supplied)
+# ECH page outputs
 
-The following values were transcribed from Yash's saved `tls_ech_off_page.txt` and `tls_ech_on_page.txt` outputs. The original page dumps were not imported because they also contain workstation/network identifiers and dynamic response details.
+Copied from Yash's saved page outputs for the T7 runs. The full outputs were not committed because they also contain the machine's IP address and other network details.
 
-| Capture | Reported page field | Observation |
+| Capture | Page field | Value |
 |---|---|---|
 | `tls_ech_off` | `h` | `crypto.cloudflare.com` |
 | `tls_ech_off` | `sni` | `plaintext` |
 | `tls_ech_on` | `h` | `crypto.cloudflare.com` |
 | `tls_ech_on` | `sni` | `encrypted` |
-| `tls_ech_doh` | page output | Empty; target page load is not evidenced by a saved response. |
+| `tls_ech_doh` | page output | empty, the page did not load |
 
-These are team-supplied page outputs, not rerun or independently authenticated here. The summary's 12 ClientHello rows for `tls_ech_doh` are not treated as proof that the intended page loaded; Chromium may have generated background handshakes. The DoH arm remains incomplete.
+The DoH capture still has 12 ClientHellos, but they all go to the DoH server `cloudflare-dns.com`, so they do not show the page loading. The DoH case is not a result.

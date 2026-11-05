@@ -1,5 +1,5 @@
-# Track 1 capture-log context
+# Track 1 capture log
 
-The imported capture log came from Yash's Docker lab on macOS/aarch64, with `tcpdump` on container `eth0`. It reports packet totals for the saved pcap files and shows the manifest client command repeated according to each row's `repeat` value. The original absolute workstation path has been omitted. Full capture commands, filters, setup commands, and repeat counts are retained per capture in `captures/manifest.json` and `captures/metadata/<capture_id>.json`.
+The capture log is from Yash's Docker lab on macOS (aarch64), with tcpdump on the container's `eth0`. It lists the packet count of each saved pcap and shows each client command repeated as many times as the recipe says. The full commands, filters and repeat counts are in `captures/manifest.json` and `captures/metadata/<capture_id>.json`. The machine's file path was left out.
 
-The log contains no per-invocation client exit status and does not establish that each repeated request succeeded. For the IPv6 case it reports zero packets, consistent with the 24-byte empty `tls_ipv6.pcap`. The log also records Docker Desktop as the capture vantage, so observed segmentation and SYN values must not be described as a physical-wire measurement.
+The log does not record whether each request succeeded. For IPv6 it shows zero packets, matching the empty `tls_ipv6.pcap`. All captures were taken inside Docker Desktop, not on a physical network cable, which matters for the packet sizes and SYN values in T3.
