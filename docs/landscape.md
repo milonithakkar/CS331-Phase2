@@ -1,76 +1,80 @@
-# TLS, TCP, certificate, and HTTP fingerprinting landscape
+# Fingerprint landscape: JA3, JA3S, JA4, JA4S, JA4T, JA4X, JA4H
 
-**Status:** Comparative technical survey for the project write-up, not a comprehensive systematic literature review or a novelty claim. Fingerprint names and algorithms below are vendor/community-defined constructions; **none of JA3, JA3S, JA4, JA4S, JA4T, JA4X, or JA4H is itself an IETF RFC fingerprint standard.** RFCs define the protocol messages and fields from which implementations may derive fingerprints. Field handling can change between implementations/releases, so retain the raw observations and pin each tool/version before comparing output strings.
+Before testing where the tools fail, we listed what each fingerprint reads, how it turns that into a string, which RFC defines the fields, and what a passive observer can see without TLS keys. One card per fingerprint is in [`basics/`](basics/README.md).
 
-The JA4 details are anchored to FoxIO's [JA4 v1.0.1 source release](https://github.com/FoxIO-LLC/ja4/releases/tag/v1.0.1), especially its [README](https://github.com/FoxIO-LLC/ja4/blob/v1.0.1/README.md), [technical details](https://github.com/FoxIO-LLC/ja4/blob/v1.0.1/technical_details/README.md), and the [TLS implementation](https://github.com/FoxIO-LLC/ja4/blob/v1.0.1/python/ja4.py). JA3 formulas are documented by the [Salesforce JA3 repository](https://github.com/salesforce/ja3). These are algorithm sources, not standards-track RFCs.
+None of these fingerprints is an IETF standard. JA3 and JA3S come from Salesforce ([repository](https://github.com/salesforce/ja3)); the JA4+ family comes from FoxIO ([v1.0.1 release](https://github.com/FoxIO-LLC/ja4/releases/tag/v1.0.1), [technical details](https://github.com/FoxIO-LLC/ja4/blob/v1.0.1/technical_details/README.md)). The RFCs define the protocol fields, and the fingerprint authors decide which fields to use, how to sort them, what to do with GREASE, and how to hash. That choice can change between tool versions, which is exactly what we ran into in T5.
 
-**Fingerprint field cards:** [JA3](basics/ja3.md) · [JA3S](basics/ja3s.md) · [JA4](basics/ja4.md) · [JA4S](basics/ja4s.md) · [JA4T](basics/ja4t.md) · [JA4X](basics/ja4x.md) · [JA4H](basics/ja4h.md).
+## Comparison
 
-## At-a-glance comparison
-
-| Fingerprint | Direction / layer and input | Construction and ordering / GREASE / hash | TLS-secret visibility | What it describes; limits |
+| | Reads | Fields | How it is built | Needs TLS keys? |
 |---|---|---|---|---|
-| **JA3** | Client TLS `ClientHello`: legacy version, cipher-suite vector, extension-type vector, supported-groups vector, EC point-format vector. TLS handshake layer over TCP; tools may also dissect TLS carried in QUIC. | Comma-joins the five fields; list values are hyphen-separated. Values retain wire order; GREASE values are removed. MD5 of the canonical string (32 hex characters). Not a cryptographic identity or proof of a client. | Normally no TLS secrets for a visible ClientHello. With ECH, a passive observer sees the outer ClientHello, not the encrypted inner fields; Initial QUIC packet protection is independently derivable for QUIC v1 Initials under RFC 9001. | Describes the observed ClientHello implementation/configuration. Extension order randomization can produce many JA3s from one client. It cannot identify a person, executable, or destination reliably by itself. |
-| **JA3S** | Server `ServerHello`: version, selected cipher suite, extension-type vector. TLS handshake layer. | Comma-joins version, selected cipher, and extension list; list order retained, GREASE filtered; MD5 output. A server-side counterpart, not a full server-stack identity. | ServerHello is normally visible in TLS 1.2/1.3. Fields hidden inside later encrypted handshake messages are not JA3S inputs. | Describes the server response observed on that TLS leg. Server configuration, negotiation, middleboxes, and protocol version affect it. It is not proof of the ultimate origin behind a TLS-terminating intermediary. |
-| **JA4** | Client `ClientHello`: transport indicator (TCP-TLS or QUIC-TLS), TLS version, SNI-present indicator, cipher count, extension count, ALPN summary, cipher-suite list, extension types, and signature-algorithm values. | Structured `a_b_c` output. In FoxIO v1.0.1, ciphers and extension types are canonicalized/sorted for the hashed components to reduce sensitivity to randomized ordering; GREASE is excluded from the client extension count and filtered from those lists. The signature-algorithm vector is included in the extension-derived component. SHA-256-derived truncated hashes are used for compact components. Check the pinned implementation for precise normalization. | Visible ordinary ClientHello needs no traffic secrets. ECH hides ClientHelloInner from passive observers; an outer-hello fingerprint is not the hidden inner fingerprint. A QUIC v1 Initial ClientHello can be reached by public Initial decryption, but later QUIC TLS/HTTP data needs the relevant handshake/1-RTT secrets. | More tolerant of cipher/extension reordering than JA3, but changes with supported capabilities, ALPN, SNI presence, TLS library/version, and implementation behavior. JA4 is not a host identity and does not prove the requested site. |
-| **JA4S** | Server response/session fingerprint from `ServerHello`: transport, TLS version, extension count, ALPN summary, selected cipher, and extension types. | Structured output. The v1.0.1 implementation uses the single selected cipher and hashes the server extension-type list in observed order; its code comment specifies inclusion of GREASE values for that list. This differs from JA4 client normalization. Exact behavior is release-specific. | `ServerHello` fields used here are ordinarily visible; no traffic secret is needed for those fields. This does not expose the later encrypted TLS 1.3 certificate or application data. | Describes the observed negotiated response/session, which is context-dependent. Do not assume identical JA4S across different client offers or TLS legs. |
-| **JA4T** | Client TCP initial SYN, before TLS: raw receive window, TCP option-kind sequence, MSS, and window scale in FoxIO's v1.0.1 implementation. This is the transport layer, not TLS. | Human-readable, unhashed tuple such as `window_option-kinds_mss_wscale`. Option-kind order is preserved; it is not a sorted/hash TLS fingerprint. Only the first SYN without ACK is used by the cited implementation. | No TLS secrets; TCP headers are below TLS. | Fingerprints the TCP endpoint visible at that capture point. A NAT may translate tuples without terminating TCP; a TCP-terminating proxy creates separate legs. One MSS, TTL, or JA4T value cannot prove proxying or identify the remote application server. |
-| **JA4X** | X.509 certificate(s) in a TLS certificate chain: issuer/subject distinguished-name information and certificate extension OIDs in FoxIO's construction. Certificate layer, not ClientHello. | Structured issuer/subject/extension components; the cited implementation encodes issuer/subject material and hashes extension OIDs (truncated SHA-256 components). Chain position and certificate parsing matter; pin the implementation. | TLS 1.2 certificates are usually visible in the handshake; TLS 1.3 certificates are encrypted after ServerHello, so passive capture generally needs traffic secrets or endpoint/server logs. QUIC TLS handshake messages are protected beyond Initial. | Describes a certificate/chain, not necessarily a unique server or client. Shared/CDN certificates, renewal, chains, and interception can change results. |
-| **JA4H** | HTTP request/application data: method, HTTP version, request-header names, language, referer/cookie indicators, and cookie-related fields in the cited construction. Applies to HTTP/1.x and HTTP/2; HTTP/3 requires the implementation to decode HTTP over QUIC. | Structured output with compact hashes. The implementation derives features from request/header/cookie material; cookie field names are sorted in the cited code, while raw/ordered variants are also available. Do not assume every product emits identical normalization or stores cookie values safely. | Plain HTTP needs none. HTTPS HTTP/1.1 and HTTP/2 need TLS decryption or trusted endpoint/proxy logs; HTTP/3 generally needs QUIC 1-RTT secrets or endpoint logs. Initial QUIC decryption alone is insufficient. | Describes an observed HTTP request pattern, not a TLS stack or user identity. It is highly request/session/content dependent and may contain sensitive data if raw cookies/headers are retained. |
+| JA3 | ClientHello | version, ciphers, extensions, groups, point formats | comma-joined in the order sent, GREASE removed, MD5 | no |
+| JA3S | ServerHello | version, chosen cipher, extensions | comma-joined in order, MD5 | no |
+| JA4 | ClientHello (TCP or QUIC) | transport, version, SNI present, cipher and extension counts, ALPN, ciphers, extensions, signature algorithms | `a_b_c`: readable prefix, hash of sorted ciphers, hash of sorted extensions + signature algorithms | no |
+| JA4S | ServerHello (TCP or QUIC) | transport, version, extension count, ALPN, chosen cipher, extensions | readable prefix, cipher, hash of extensions in order | no |
+| JA4T | TCP SYN | window, TCP option kinds, MSS, window scale | plain text, not hashed, option order kept | no, but depends on capture point |
+| JA4X | each X.509 certificate | issuer and subject fields, extension OIDs | three truncated SHA-256 hashes | TLS 1.2 no, TLS 1.3 yes |
+| JA4H | HTTP request | method, version, headers, cookies, language | readable prefix and hashes | yes for HTTPS |
 
-## What the relevant RFCs do—and do not—standardize
+What each one describes:
 
-| RFC / section | Protocol contribution relevant to the observation | Fingerprint status |
+- JA3 and JA4 describe the TLS library and its settings on the client, not the person or the exact app. Apps that share a library can share a fingerprint (curl and Python share JA4 part b in T5), and one app can give many (Chromium gives 50 JA3s in T5).
+- JA3S and JA4S depend on what the client offered as well as on the server.
+- JA4T describes the TCP stack nearest to the capture point. A NAT keeps it; a proxy that ends the TCP connection replaces it (T3).
+- JA4X describes how a certificate was built. JA4H describes one HTTP request.
+
+## Which RFC defines what
+
+| RFC | What it defines that the fingerprints use |
+|---|---|
+| [RFC 5246 §7.4.1](https://www.rfc-editor.org/rfc/rfc5246.html#section-7.4.1.2), [RFC 8446 §4.1](https://www.rfc-editor.org/rfc/rfc8446.html#section-4.1.2) | ClientHello and ServerHello (TLS 1.2, TLS 1.3) |
+| [RFC 6066 §3](https://www.rfc-editor.org/rfc/rfc6066.html#section-3) | SNI |
+| [RFC 7301](https://www.rfc-editor.org/rfc/rfc7301.html) | ALPN |
+| [RFC 8422 §5.1](https://www.rfc-editor.org/rfc/rfc8422.html#section-5.1) | supported groups and EC point formats |
+| [RFC 8446 §4.2.3](https://www.rfc-editor.org/rfc/rfc8446.html#section-4.2.3) | signature algorithms |
+| [RFC 8701](https://www.rfc-editor.org/rfc/rfc8701.html) | GREASE values (the RFC defines them; each fingerprint decides whether to drop them) |
+| [RFC 9849](https://www.rfc-editor.org/rfc/rfc9849.html), [RFC 9460](https://www.rfc-editor.org/rfc/rfc9460.html) | ECH, and the DNS HTTPS record that carries its key |
+| [RFC 9000 §7.2](https://www.rfc-editor.org/rfc/rfc9000.html#section-7.2), [RFC 9001 §5.2](https://www.rfc-editor.org/rfc/rfc9001.html#section-5.2) | QUIC connection IDs and the public Initial keys |
+| [RFC 9293 §3.7.1](https://www.rfc-editor.org/rfc/rfc9293.html#section-3.7.1), [RFC 6691](https://www.rfc-editor.org/rfc/rfc6691.html) | TCP options and MSS |
+| [RFC 5280](https://www.rfc-editor.org/rfc/rfc5280.html), [RFC 8446 §4.4.2](https://www.rfc-editor.org/rfc/rfc8446.html#section-4.4.2) | X.509 certificates and the TLS Certificate message |
+| [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110.html), [RFC 9113](https://www.rfc-editor.org/rfc/rfc9113.html), [RFC 9114](https://www.rfc-editor.org/rfc/rfc9114.html), [RFC 6265](https://www.rfc-editor.org/rfc/rfc6265.html) | HTTP, HTTP/2, HTTP/3, cookies |
+| [RFC 8484](https://www.rfc-editor.org/rfc/rfc8484.html) | DNS over HTTPS |
+
+## What a passive observer can see
+
+| What | Without keys | With keys |
 |---|---|---|
-| [RFC 5246 §§7.4.1.2–7.4.1.3](https://www.rfc-editor.org/rfc/rfc5246.html#section-7.4.1.2) and [RFC 8446 §§4.1.2–4.1.3](https://www.rfc-editor.org/rfc/rfc8446.html#section-4.1.2) | TLS ClientHello and ServerHello structure. | Defines wire fields, **not** JA3/JA4 formulas. |
-| [RFC 6066 §3](https://www.rfc-editor.org/rfc/rfc6066.html#section-3), [RFC 7301](https://www.rfc-editor.org/rfc/rfc7301.html), [RFC 8422 §5.1](https://www.rfc-editor.org/rfc/rfc8422.html#section-5.1), [RFC 8446 §4.2.3](https://www.rfc-editor.org/rfc/rfc8446.html#section-4.2.3), [RFC 8701](https://www.rfc-editor.org/rfc/rfc8701.html) | SNI, ALPN, supported groups/point formats, signature algorithms, and GREASE behavior used by TLS fingerprints. | These RFCs define extensions and reserved GREASE values, not fingerprint filtering/sorting/hash policy. JA3/JA4 implementations choose that policy. |
-| [RFC 9849](https://www.rfc-editor.org/rfc/rfc9849.html) and [RFC 9460](https://www.rfc-editor.org/rfc/rfc9460.html) | Encrypted ClientHello privacy and DNS HTTPS/SVCB service parameters. | ECH changes what an on-path observer can see; it does not define a new JA fingerprint. |
-| [RFC 9000 §§7.2, 12.2, 14.1](https://www.rfc-editor.org/rfc/rfc9000.html) and [RFC 9001 §§4–5.2](https://www.rfc-editor.org/rfc/rfc9001.html#section-5.2) | QUIC connection IDs, transport behavior, TLS integration, and public Initial key derivation. | QUIC/TLS carries TLS handshake messages; RFC 9001 does not specify JA4. The Initial DCID/key-context rule matters to recovering a QUIC ClientHello. |
-| [RFC 9293 §3.2 and §3.7.1](https://www.rfc-editor.org/rfc/rfc9293.html#section-3.7.1), [RFC 6691](https://www.rfc-editor.org/rfc/rfc6691.html) | TCP options and the meaning/limits of the advertised MSS. | Defines TCP fields that JA4T can observe; does not define JA4T or make MSS evidence of a proxy. |
-| [RFC 5280](https://www.rfc-editor.org/rfc/rfc5280.html), [RFC 8446 §4.4.2](https://www.rfc-editor.org/rfc/rfc8446.html#section-4.4.2) | X.509 certificate profile and TLS Certificate message. | Defines certificate/message content, not JA4X's selected fields or hashing. |
-| [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110.html), [RFC 9113](https://www.rfc-editor.org/rfc/rfc9113.html), [RFC 9114](https://www.rfc-editor.org/rfc/rfc9114.html), [RFC 6265](https://www.rfc-editor.org/rfc/rfc6265.html) | HTTP semantics, HTTP/2, HTTP/3, and cookies. | Define HTTP wire/application behavior, not JA4H. |
-| [RFC 8484](https://www.rfc-editor.org/rfc/rfc8484.html) | DNS over HTTPS. | Relevant to name visibility, not a TLS fingerprint definition. |
+| TCP SYN (JA4T) | yes, but it depends on where you capture and on offload | keys do not matter |
+| TCP ClientHello (JA3, JA4) | yes; with ECH only the outer ClientHello | the ECH inner hello needs the server's ECH key, not the session keys |
+| QUIC v1 ClientHello | yes; the Initial keys come from the connection ID in the packet (RFC 9001 §5.2) | not needed |
+| ServerHello (JA3S, JA4S) | yes | not needed |
+| TLS 1.3 certificate (JA4X) | no | yes |
+| HTTPS request (JA4H) | no | yes |
+| DNS name | yes over plain DNS, no over DoH | - |
 
-## Visibility and decryption boundaries
+Seeing one layer does not mean seeing the next. Decrypting QUIC Initial packets gives the ClientHello, but not the HTTP/3 request that follows.
 
-| Observation | Ordinary passive capture without TLS secrets | With the appropriate keys or trusted endpoint logs |
+## What our tests found, per fingerprint
+
+| Fingerprint | Test | Finding |
 |---|---|---|
-| TCP SYN / JA4T inputs | Visible, subject to capture point, truncation, offload, and path effects. | Keys are irrelevant; endpoint/interface visibility may still be needed. |
-| TCP TLS ClientHello / JA3 or JA4 | Visible when ordinary ClientHello is in the capture. ECH hides ClientHelloInner; only the outer form is available passively. | ECH inner contents require the relevant ECH private/decryption context or endpoint instrumentation. |
-| QUIC v1 Initial ClientHello | Initial packet protection can be derived from public version/DCID inputs as specified by RFC 9001, so TLS secrets are not required for the Initial ClientHello. Capture completeness, correct original DCID context, and a supporting dissector still matter. | TLS traffic secrets are needed for later encrypted QUIC/TLS handshake and application data, not for v1 Initial key derivation. |
-| TLS ServerHello / JA3S or JA4S | The ServerHello itself is normally visible in TLS 1.2/1.3, but an incomplete capture may omit it. | Secrets do not reveal a ServerHello that was not captured; secrets do expose later encrypted handshake fields. |
-| TLS 1.3 certificate / JA4X | Generally encrypted after ServerHello. | TLS traffic secrets or endpoint/server certificate logs. TLS 1.2 certificate visibility is different and commonly plaintext. |
-| HTTPS JA4H / HTTP request | Not readable from encrypted TLS/QUIC application data. | TLS key log/appropriate QUIC secrets or trusted TLS termination/endpoint logs. |
-| DNS hostname attribution | Ordinary DNS queries may be visible; DoH/DoT encrypts DNS transport. ECH and encrypted DNS are separate privacy controls. | Resolver/client logs may attribute names, subject to policy and provenance. |
+| JA3 | T5 | Chromium: 50 JA3s in 50 connections, because of extension shuffling |
+| JA4 | T1 | TShark and FoxIO both read the QUIC ClientHello, 5/5 per client |
+| JA4 | T4 | a post-quantum key share changes JA4 through side effects (12 vs 14 extensions) |
+| JA4 | T5 | the same 50 Chromium hellos give 15 JA4s with TShark 4.6.8 or FoxIO v0.18.6 and 1 with FoxIO v1.0.1, because of GREASE in the signature algorithms |
+| JA4 | T7 | ECH adds one extension, so JA4 changes |
+| JA4T / JA4TS | T3 | inside Docker the SYN-ACK values come from Docker's network stack; on the Wi-Fi card the container's SYN has Windows values |
+| JA4X, JA4H | T2 | 0 without keys, 5 with keys on TLS 1.3 |
 
-A fingerprint computed from one visible layer does not imply visibility into another. For example, successful QUIC Initial decryption can recover a ClientHello but does not decrypt later HTTP/3 requests; JA4/JA4H are therefore distinct measurements.
+## Rules we followed when reading results
 
-## Interpretation rules for this project
+1. Say where the capture was taken. A fingerprint describes what was seen at that point.
+2. Record the tool and its version. FoxIO's Rust ja4 reads packets through TShark, so the two agreeing is not two independent parsers.
+3. JA3 keeps the order of lists; JA4 sorts them. JA4S and JA4T do not sort. GREASE handling depends on the fingerprint and on the tool version.
+4. A hash is a short label, not a unique ID. Different clients can share one, and one client can change it after an update.
+5. Do not decide there is a proxy from one MSS or TTL value. In T3 we only said so after seeing the same connection at two capture points.
 
-1. **Name the observed endpoint and capture point.** A fingerprint describes the protocol messages seen on that network leg. If an intermediary terminates TLS/TCP, the observed handshake can be the intermediary's, not the ultimate origin's. NAT alone is not proof of TCP termination.
-2. **Do not compare labels without pinning implementations.** Record release/commit, executable/build provenance, TShark/Wireshark version, fields, and normalization. In the imported work, FoxIO's Rust CLI uses TShark, so agreement between those tools is not independent packet-decoder evidence.
-3. **Separate ordering from membership.** JA3 retains selected list order; JA4's client-side canonicalization sorts selected lists to reduce ordering instability. JA4S and JA4T construction differs; neither should be assumed to follow JA4's sorting rules. GREASE behavior is algorithm- and version-specific.
-4. **Treat hashes as compact labels, not uniqueness guarantees.** Different clients can collide or share components, and the same software can change outputs after library, policy, extension, or tool updates.
-5. **Treat passive visibility as conditional.** Ordinary TLS ClientHello fields are generally visible, ECH inner fields are not; TLS 1.3 certificates and HTTP application data are encrypted; QUIC Initial is a special publicly decryptable packet-protection layer, not a general QUIC decryption capability.
-6. **Do not make a proxy claim from one MSS or TTL.** TCP fingerprints are capture-vantage-dependent. A single SYN/SYN-ACK option asymmetry is a clue to investigate, not proof of an intermediary or attribution error.
+## Other references
 
-## Project evidence snapshot and open bounds
-
-| Workstream | Evidence inspected | Supported statement | Not supported |
-|---|---|---|---|
-| QUIC v1 Initial extraction | User-run WSL batch committed at `results/track2/verification-batch-20261104-201936/`; hashes and result JSON checked in this checkout. Six mutation cases × two clients yield 54/54 exact-byte multiset matches against TShark output from each same PCAP variant. | The current extractor matches TShark on these two captures and these bounded cases. A header-only inventory identifies five later client Initial DCIDs per trace that equal server Initial SCIDs; they are post-switch client packets, not server-direction decrypt attempts. | Broad QUIC conformance, complete connection tracking, independent ground truth, or a novel reassembly contribution. |
-| L3 / JA4T attribution candidate | Each of two separate imported offload PCAPs has three complete SYN/SYN-ACK pairs. Client profile `1460/10/64240/64`; peer profile `65495/7/65408/63`; all frames are 74 bytes. The batch analyzer warns against proxy inference from one capture. | The same intra-capture option asymmetry was observed in both separate traces. A separate user-reported controlled probe had peer MSS 1460 and its flow was absent from WSL `eth0`. | Proxy termination, remote-stack identity, a demonstrated JA4T error, or novelty. Paired Windows/outer capture and prior-art/rubric review remain open. |
-| L4 / PQ and classic TLS | Imported raw T4 output: five ClientHellos per curl arm; TShark length values 1511/508; server-selected groups 4588/29; JA4 values differ. | A controlled-client configuration change correlates with a larger ClientHello and a different negotiated group and fingerprint in these samples. | A general PQ fingerprint claim, direct JA4 encoding of the selected group, or broad client coverage. |
-| L5 / stability | Imported 50-hello Chromium JSON contains 50 distinct JA3, 15 distinct released-path JA4 outputs, and 15 distinct first signature-algorithm GREASE-pattern values. The reported `ja4-main` count of 1 is not preserved as per-capture raw output. | A release/source-path difference is visible in the imported summary/raw fields and is consistent with signature-algorithm GREASE variation. | Independently reproduced `ja4-main` value, a claim all JA4 implementations are unstable, or a new contribution. |
-| L7 / ECH and DoH | Team-supplied page outputs for ECH off/on and imported TLS JSON; ECH+DoH target page output is empty. | In the two saved page runs, the site reports plaintext SNI with ECH off and encrypted SNI with ECH on; raw outer ClientHello names include the target name vs `cloudflare-ech.com`. | Successful ECH+DoH page load, absence of all DNS leakage, or a broad privacy guarantee. |
-
-Track 1 source provenance and the remaining L2/L6 limits are recorded in [`docs/track1-evidence-audit.md`](track1-evidence-audit.md) and [`LEDGER.md`](../LEDGER.md). The exact WSL batch provenance is summarized in [`results/verification-status.md`](../results/verification-status.md).
-
-## Primary algorithm and protocol references
-
-- [Salesforce JA3 source and documentation](https://github.com/salesforce/ja3)
-- [FoxIO JA4 v1.0.1 release](https://github.com/FoxIO-LLC/ja4/releases/tag/v1.0.1), [JA4 algorithm source](https://github.com/FoxIO-LLC/ja4/blob/v1.0.1/python/ja4.py), [JA4 TCP source](https://github.com/FoxIO-LLC/ja4/blob/v1.0.1/rust/ja4/src/tcp.rs), [JA4H source](https://github.com/FoxIO-LLC/ja4/blob/v1.0.1/python/ja4h.py), [JA4X source](https://github.com/FoxIO-LLC/ja4/blob/v1.0.1/python/ja4x.py)
-- [p0f source](https://github.com/p0f/p0f) — adjacent passive TCP/IP OS fingerprinting prior art; not the same algorithm as JA4T.
-- Protocol standards listed in the RFC table above. None defines JA3/JA4 or their derivatives.
-
-This comparison is enough to frame project measurements, but a contribution decision still requires a targeted review of prior work and the course rubric. Do not infer novelty from the project evidence table.
+- [FoxIO JA4 Python source](https://github.com/FoxIO-LLC/ja4/blob/v1.0.1/python/ja4.py), [JA4T Rust source](https://github.com/FoxIO-LLC/ja4/blob/v1.0.1/rust/ja4/src/tcp.rs), [JA4H](https://github.com/FoxIO-LLC/ja4/blob/v1.0.1/python/ja4h.py), [JA4X](https://github.com/FoxIO-LLC/ja4/blob/v1.0.1/python/ja4x.py)
+- [p0f](https://github.com/p0f/p0f), an older passive TCP/IP OS fingerprinting tool, for comparison with JA4T

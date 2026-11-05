@@ -1,34 +1,29 @@
-# T0: Lab and script checks
+# T0: Build, tests and capture checks
 
-**Question:** before trusting Track 1 output, check the lab recipes, scripts, and Track 2 code.
+Before trusting any number, we check that the code builds, the tests pass, and the committed pcaps are the ones the results were computed from.
 
 ## What is checked
 
-- The modular C++ QUIC project builds and its lightweight CTest target runs.
-- The repository pytest suite covers manifest/hash validation, reference runner behavior, and Track 1 helper scripts.
-- Track 1 capture IDs and command placeholders are valid.
-- Tool versions are recorded in `results/versions.txt` for Yash's Docker lab.
+- The C++ QUIC extractor builds, and its test program passes (CTest).
+- The Python tests pass (pytest). They cover the capture manifest and hashes, the reference-tool runner, the Track 1 scripts, the QUIC damage harness and the seven-row checker.
+- Every pcap matches the SHA-256 recorded in `captures/manifest.json`.
+- Tool versions for the Docker lab are in `results/versions.txt`.
 
 ## Commands
 
-For the current repository and a locally installed CMake/OpenSSL toolchain:
-
 ```sh
-make test
-make check
+make test     # build, CTest, pytest
+make check    # pcap hashes against the manifest
 ```
 
-When the Docker lab is available:
+GitHub Actions runs both on every push (`.github/workflows/ci.yml`).
 
-```sh
-make lab-image
-make lab-eval
-```
+## Result
 
-The imported Yash capture of its C++ test run is preserved at `results/checkpoint_build_test.txt`.
+The last recorded run, in `results/track2/verification-batch-20261105-105416/make-test.log`, has CTest 1/1 and pytest 52 passed. The source files that batch recorded hashes for are unchanged in the repository. `make check` reports 16 captures: 15 with packets and the empty IPv6 one.
 
-## Imported result and scope
+`results/checkpoint_build_test.txt` is an older log from Yash's lab (CTest 1/1, 9 pytest tests, 1/1 with sanitizers) from before most of the tests existed.
 
-The teammate log reports the C++ build completed, 1/1 CTest target passed, 9 pytest tests passed, and 1/1 sanitizer CTest target passed. T0 also records four Track 1 script checks. The captured output does not state the exact repository source SHA, so it is corroborating team evidence, not proof about every later commit.
+## What it does not show
 
-The current branch's own `make test` and CI outcomes are separate and should be recorded in `results/verification-status.md` after changes. A Track 1 tool check does not prove correctness of our C++ PCAP/flow extractor; that integration is still pending.
+Passing tests show the code does what the tests check. They do not show that the C++ extractor is right on traffic it has not seen. That is what the comparison with TShark in T1 is for.
