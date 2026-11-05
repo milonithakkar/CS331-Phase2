@@ -1,3 +1,3 @@
 # Packet captures
 
-Commit only reviewed, project-related evidence captures. Each capture must have a matching record in `captures/metadata/` and an entry in `captures/manifest.json`. Use only controlled, non-sensitive traffic; do not include personal browsing or credentials.
+Only controlled test traffic goes here: no personal browsing, no passwords. Each pcap needs a metadata file in `captures/metadata/` and an entry in `captures/manifest.json`.
