@@ -1,16 +1,20 @@
-# Experiment scripts
+# Scripts
 
-Python orchestrates experiment metadata and reference-tool runs; C++ remains the QUIC parsing/cryptography/reassembly core. Scripts must record exact argv, tool errors, and raw outputs. They must not hand-author experimental numbers.
+Python runs the captures, the reference tools and the checks; the QUIC parsing and crypto are in the C++ code under `code/quic/`. The scripts save the exact commands and raw tool outputs, so every number can be traced back to a run.
 
-- `preflight.py` records CMake/compiler/OpenSSL, TShark/FoxIO versions, interfaces, and actual TShark QUIC/fingerprint fields. `make preflight` writes `results/preflight-current.json`; the imported WSL snapshot remains at `results/preflight.json`.
-- `reference_baseline.py` runs FoxIO JA4+ and TShark for the earlier single QUIC baseline and writes to `results/reference/`. It records output but does not interpret differences.
-- `evaluate.py` validates the current capture manifest, hashes, metadata, packet-count status, and artifact paths. `make eval` emits corpus status only; it does not rerun tools or infer a limitation.
-- `analyze.py` reruns the Track 1 multi-capture TShark/FoxIO analysis. `make lab-eval` writes fresh tool output under ignored `results/reproduced/`, never replacing imported `results/raw/` or `results/summary.*`.
-- `capture.py` can recapture one reviewed Track 1 recipe only when explicitly invoked with `--confirm-network`. It writes to ignored `captures/reproduced/`, records command outcomes, and never overwrites committed evidence by default.
-- `versions.sh` records the lab's exact tool versions; `make lab-versions` writes to ignored `results/reproduced/versions.txt`.
-- `quic_impairment.py` creates deterministic record-order, Initial-CRYPTO loss, and snap-length-truncation PCAP variants, then compares complete ClientHello byte multisets from the C++ extractor and TShark. It records input/variant hashes, commands, raw logs, exact-byte recall, missed/extra outputs, and failure diagnostics. It preserves repeated `tls.handshake_raw` values from the observed TShark JSON output. Send `--work-dir` under ignored `results/reproduced/`; source captures are never modified.
-- `quic_initial_inventory.py` writes a portable JSON inventory of QUIC v1 Initial headers in classic Ethernet PCAPs, including UDP endpoints and DCID/SCID changes. It does not decrypt payloads; the current audited output is committed under `results/track2/`.
-- `l3_proxy_sanity.py` extracts per-stream TCP SYN/SYN-ACK profiles from one or more PCAPs and optionally compares manually paired streams. It does not calculate JA4T/JA4TS and never infers a proxy from MSS/TTL alone; use ignored output under `results/reproduced/l3/` for scratch runs.
-- `verify_submission_batch.sh` batches WSL build/tests, manifest check, QUIC header inventory, imported offload SYN analysis, and both QUIC impairment runs into a new tracked `results/track2/verification-batch-*` directory. It does not capture traffic or automatically stage/commit results; review before committing.
+| Script | What it does |
+|---|---|
+| `capture.py` | Makes one Track 1 capture again from its recipe. Only runs with `--confirm-network` and writes to `captures/reproduced/`. Used by `make lab-capture`. |
+| `analyze.py` | Runs TShark and FoxIO on all Track 1 pcaps and writes a fresh summary to `results/reproduced/`. Used by `make lab-eval`. |
+| `versions.sh` | Records the lab's tool versions (`make lab-versions`). |
+| `preflight.py` | Records CMake, compiler, OpenSSL, TShark and FoxIO versions and the TShark fields available. `make preflight` writes `results/preflight-current.json`. |
+| `reference_baseline.py` | Runs TShark and FoxIO on one registered capture and saves the outputs to `results/reference/` (`make baseline`). |
+| `evaluate.py` | Checks the manifest, hashes, metadata and packet counts (`make check`, `make eval`). |
+| `quic_initial_inventory.py` | Lists the QUIC v1 Initial headers in a pcap: UDP endpoints and connection IDs, without decrypting. |
+| `quic_impairment.py` | Makes damaged copies of a QUIC pcap (reordered, dropped or cut packets) and compares the C++ extractor's ClientHellos with TShark's on each copy. |
+| `l3_proxy_sanity.py` | Reads the SYN and SYN-ACK values per TCP stream from one or more pcaps, and compares streams that were paired by hand. |
+| `verify_all_seven_rows.py` | Checks the committed results for L1 to L7; `--live` also reruns the tools. |
+| `capture_ipv6_egress.sh` | Captures a `curl -6` and `curl -4` request to the same host on a network with IPv6. |
+| `verify_submission_batch.sh` | Runs the build, tests and all Track 2 checks in one go into a new folder under `results/track2/`. |
 
-The imported Track 1 analysis is team-supplied from a Docker environment and has not been rerun as a full suite. The user separately reports a TShark 4.6.4 byte-set comparison for the two QUIC PCAPs. See `docs/track1-evidence-audit.md` and `results/verification-status.md`.
+The tests for these scripts are in `tests/` and run with `make test`. More on running them in [`docs/ubuntu-setup.md`](../../docs/ubuntu-setup.md) and [`docs/verification-batch.md`](../../docs/verification-batch.md).
